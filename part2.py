@@ -97,8 +97,6 @@ plt.title('Comparaison des modèles avec et sans régularisation Ridge')
 plt.legend()
 plt.show()
 
-
-
 # 4. Comparaison des Coefficients
 
 # Calcul de l'erreur quadratique moyenne (RMSE) et du R2 Lineaire 
