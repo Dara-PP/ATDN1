@@ -1,11 +1,9 @@
 import time
 from matplotlib import pyplot as plt
 import pandas as pd
-
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.feature_extraction.text import CountVectorizer
-
 from sklearn import svm 
 
 
@@ -42,6 +40,8 @@ print(f"Temps d'entraînement: {train_time} secondes")
 y_pred = svm_model.predict(X_test)
 
 # Évaluation avec les différentes metrics
+print("Matrix de confusion:")
+print(confusion_matrix(y_test, y_pred))
 print("Rapport de classification:")
 print(classification_report(y_test, y_pred))
 

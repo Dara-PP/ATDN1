@@ -1,7 +1,6 @@
 import time
 from matplotlib import pyplot as plt
 import pandas as pd
-
 from sklearn.ensemble import VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
@@ -48,13 +47,13 @@ clf3.fit(X_train, y_train)
 train_time = time.time() - start_time
 print(f"Temps d'entraînement (Bayes) : {train_time:.2f} secondes")
 
-"""  # Les modeles prédits apres entrainement sur l'ensemble de test ici X_test y_pred contient ensuite les classes prédites par les modeles"""
-
+# Prediction de nos 3 modeles
+"""  # Les modeles prédits apres entrainement sur l'ensemble de test ici X_test. y_pred contient ensuite les classes prédites par les modeles"""
 y_pred_clf1 = clf1.predict(X_test)
 y_pred_clf2 = clf2.predict(X_test)
 y_pred_clf3 = clf3.predict(X_test)
 
-# Évaluation avec les différentes metrics
+# Évaluation avec les différentes metrics obtenus avec le classification_report  (precision, recall, f1-score)
 print("Matrix Logistic Recgression:", confusion_matrix(y_test, y_pred_clf1))
 print(classification_report(y_test, y_pred_clf1))
 print("Matrix SVM:", confusion_matrix(y_test, y_pred_clf2))
@@ -77,15 +76,19 @@ y_pred_prob3 = clf3.predict_proba(X_test)[:, 1]
 fpr3, tpr3, _ = roc_curve(y_test, y_pred_prob3)
 roc_auc3 = roc_auc_score(y_test, y_pred_prob3)
 
-# Courbe ROC pour Voting Classifier (Hard)
-hard_voting = VotingClassifier(estimators=[
-    ('lr', clf1), ('svm', clf2), ('nb', clf3)
-], voting='hard')
-start_time = time.time()
+# Prediction Voting Classifier (Hard)
+hard_voting = VotingClassifier(
+    estimators=[('lr', clf1), ('svm', clf2), ('nb', clf3)],
+    voting='hard'
+)
 hard_voting.fit(X_train, y_train)
 y_pred_hard = hard_voting.predict(X_test)
-train_time = time.time() - start_time
-print(f"Temps d'entraînement (Classifier Hard) : {train_time:.2f} secondes")
+
+# Evaluation Voting Classifier (Hard)
+accuracy_hard = accuracy_score(y_test, y_pred_hard)
+print("Classifier HARD Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred_hard))
+print(classification_report(y_test, y_pred_hard))
 
 # Courbe ROC pour Voting Classifier (Soft)
 soft_voting = VotingClassifier(estimators=[
@@ -95,22 +98,24 @@ start_time = time.time()
 soft_voting.fit(X_train, y_train)
 train_time = time.time() - start_time
 print(f"Temps d'entraînement (Classifier Soft) : {train_time:.2f} secondes")
-y_pred_prob_voting = soft_voting.predict_proba(X_test)[:, 1]
-fpr_v, tpr_v, _ = roc_curve(y_test, y_pred_prob_voting)
-roc_auc_v = roc_auc_score(y_test, y_pred_prob_voting)
+
+# Prediction Voting Classifier (Soft)
+y_pred_prob_soft = soft_voting.predict_proba(X_test)[:, 1]
+fpr_s, tpr_s, _ = roc_curve(y_test, y_pred_prob_soft)
+roc_auc_s = roc_auc_score(y_test, y_pred_prob_soft)
 
 # Convertir les probabilités en classes binaires
-y_pred_binary1 = (y_pred_prob_voting >= 0.5).astype(int)
-accuracy = accuracy_score(y_test, y_pred_binary1)
-print("Classifier SOFT:", confusion_matrix(y_test, y_pred_binary1))
-print(classification_report(y_test, y_pred_binary1))
+y_pred_binary_soft = (y_pred_prob_soft >= 0.5).astype(int)
+accuracy = accuracy_score(y_test, y_pred_binary_soft)
+print("Classifier SOFT:", confusion_matrix(y_test, y_pred_binary_soft))
+print(classification_report(y_test, y_pred_binary_soft))
 
-# Tracer du Graphique
+# Tracer du Graphique avec tous nos modeles
 plt.figure(figsize=(8, 8))
 plt.plot(fpr1, tpr1, label=f'Logistic Regression (AUC = {roc_auc1:.2f})', color='blue')
 plt.plot(fpr2, tpr2, label=f'SVM (AUC = {roc_auc2:.2f})', color='green')
 plt.plot(fpr3, tpr3, label=f'Naive Bayes (AUC = {roc_auc3:.2f})', color='red')
-plt.plot(fpr_v, tpr_v, label=f'Voting Classifier Soft (AUC = {roc_auc_v:.2f})', color='purple')
+plt.plot(fpr_s, tpr_s, label=f'Voting Classifier Soft (AUC = {roc_auc_s:.2f})', color='purple')
 plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random Classifier')
 plt.title("Courbes ROC de tous les modèles")
 plt.xlabel("False Positive Rate")
