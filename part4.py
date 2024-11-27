@@ -10,6 +10,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 from sklearn.feature_extraction.text import CountVectorizer
 
+"""Exercice 4 : Optimisation des hyperparamètres"""
+
 # Chargement des données
 data = pd.read_csv('./sms_spam.csv', encoding='latin1')
 

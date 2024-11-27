@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 
-"""Exercice 2. Mélange de modèles (Voting Classifier)"""
+"""Exercice 3 : Classification avec Gaussian Mixture Models (GMM)"""
 
 # Chargement des données
 data = pd.read_csv('./sms_spam.csv', encoding='latin1')
