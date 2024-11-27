@@ -1,126 +1,120 @@
-import numpy as np
+import time
+from matplotlib import pyplot as plt
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.metrics import r2_score, mean_squared_error
-from scipy import stats
+from sklearn.ensemble import VotingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn import svm
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve
 
-"""I - Régression Linéaire et Polynomiale avec Visualisation et Analyse des Résidus"""
+from sklearn.feature_extraction.text import CountVectorizer
 
-data = pd.read_csv('./house-prices-advanced-regression-techniques/train.csv') # Chargment du CSV Cible 
+"""Exercice 2. Mélange de modèles (Voting Classifier)"""
+# Chargement des données
+data = pd.read_csv('./sms_spam.csv', encoding='latin1')
 
-X = data[['GrLivArea']].values  # Variables explicative surface de terrain
-Y = data['SalePrice'].values  # Variable cible prix de vente
+# Prétraitement
+data = data[['v1', 'v2']]
+data = data.dropna(subset=['v1', 'v2'])
+data['v2'] = data['v2'].str.strip()
+data['v1'] = data['v1'].map({'ham': 0, 'spam': 1})
 
+# Vectorisation des textes
+vectorizer = CountVectorizer(stop_words='english', max_features=3000)
+X = vectorizer.fit_transform(data['v2']).toarray()
+y = data['v1'].values
 
-"""1. Ajustement du Modèle Linéaire :"""
-# Visualisation de la relation entre Surface habitable et Prix de vente
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, color='blue')
-plt.xlabel('Surface habitable totale (GrLivArea)')
-plt.ylabel('Prix de vente (SalePrice)')
-plt.title('Surface de Terrain')
-plt.legend()
+# Division des données
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Modèles individuels
+clf1 = LogisticRegression(max_iter=1000)
+clf2 = svm.SVC(kernel='linear', probability=True)
+clf3 = MultinomialNB()
+
+# Entraînement des differents modèles
+start_time = time.time()
+clf1.fit(X_train, y_train)
+train_time = time.time() - start_time
+print(f"Temps d'entraînement (LogisticRegression) : {train_time:.2f} secondes")
+start_time = time.time()
+clf2.fit(X_train, y_train)
+train_time = time.time() - start_time
+print(f"Temps d'entraînement (SVM) : {train_time:.2f} secondes")
+start_time = time.time()
+clf3.fit(X_train, y_train)
+train_time = time.time() - start_time
+print(f"Temps d'entraînement (Bayes) : {train_time:.2f} secondes")
+
+"""  # Les modeles prédits apres entrainement sur l'ensemble de test ici X_test y_pred contient ensuite les classes prédites par les modeles"""
+
+y_pred_clf1 = clf1.predict(X_test)
+y_pred_clf2 = clf2.predict(X_test)
+y_pred_clf3 = clf3.predict(X_test)
+
+# Évaluation avec les différentes metrics
+print("Matrix Logistic Recgression:", confusion_matrix(y_test, y_pred_clf1))
+print(classification_report(y_test, y_pred_clf1))
+print("Matrix SVM:", confusion_matrix(y_test, y_pred_clf2))
+print(classification_report(y_test, y_pred_clf2))
+print("Naives Bayes:", confusion_matrix(y_test, y_pred_clf3))
+print(classification_report(y_test, y_pred_clf3))
+
+# Courbe ROC pour Logistic Regression
+y_pred_prob1 = clf1.predict_proba(X_test)[:, 1]
+fpr1, tpr1, _ = roc_curve(y_test, y_pred_prob1)
+roc_auc1 = roc_auc_score(y_test, y_pred_prob1)
+
+# Courbe ROC pour SVM
+y_pred_prob2 = clf2.predict_proba(X_test)[:, 1]
+fpr2, tpr2, _ = roc_curve(y_test, y_pred_prob2)
+roc_auc2 = roc_auc_score(y_test, y_pred_prob2)
+
+# Courbe ROC pour Naive Bayes
+y_pred_prob3 = clf3.predict_proba(X_test)[:, 1]
+fpr3, tpr3, _ = roc_curve(y_test, y_pred_prob3)
+roc_auc3 = roc_auc_score(y_test, y_pred_prob3)
+
+# Courbe ROC pour Voting Classifier (Hard)
+hard_voting = VotingClassifier(estimators=[
+    ('lr', clf1), ('svm', clf2), ('nb', clf3)
+], voting='hard')
+start_time = time.time()
+hard_voting.fit(X_train, y_train)
+y_pred_hard = hard_voting.predict(X_test)
+train_time = time.time() - start_time
+print(f"Temps d'entraînement (Classifier Hard) : {train_time:.2f} secondes")
+
+# Courbe ROC pour Voting Classifier (Soft)
+soft_voting = VotingClassifier(estimators=[
+    ('lr', clf1), ('svm', clf2), ('nb', clf3)
+], voting='soft')
+start_time = time.time()
+soft_voting.fit(X_train, y_train)
+train_time = time.time() - start_time
+print(f"Temps d'entraînement (Classifier Soft) : {train_time:.2f} secondes")
+y_pred_prob_voting = soft_voting.predict_proba(X_test)[:, 1]
+fpr_v, tpr_v, _ = roc_curve(y_test, y_pred_prob_voting)
+roc_auc_v = roc_auc_score(y_test, y_pred_prob_voting)
+
+# Convertir les probabilités en classes binaires
+y_pred_binary1 = (y_pred_prob_voting >= 0.5).astype(int)
+accuracy = accuracy_score(y_test, y_pred_binary1)
+print("Classifier SOFT:", confusion_matrix(y_test, y_pred_binary1))
+print(classification_report(y_test, y_pred_binary1))
+
+# Tracer du Graphique
+plt.figure(figsize=(8, 8))
+plt.plot(fpr1, tpr1, label=f'Logistic Regression (AUC = {roc_auc1:.2f})', color='blue')
+plt.plot(fpr2, tpr2, label=f'SVM (AUC = {roc_auc2:.2f})', color='green')
+plt.plot(fpr3, tpr3, label=f'Naive Bayes (AUC = {roc_auc3:.2f})', color='red')
+plt.plot(fpr_v, tpr_v, label=f'Voting Classifier Soft (AUC = {roc_auc_v:.2f})', color='purple')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random Classifier')
+plt.title("Courbes ROC de tous les modèles")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.legend(loc="lower right")
+plt.grid()
 plt.show()
-
-# Regression Lineaire
-regression = LinearRegression()
-regression.fit(X, Y)
-y_pred = regression.predict(X)
-
-# Visualisation des prédictions modèle Linéaire
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, color='blue', alpha=0.5, label='Données observées')
-plt.scatter(X, y_pred, color='red', alpha=0.5, label='Prédictions du modèle linéaire')
-plt.xlabel('Surface habitable totale (GrLivArea)')
-plt.ylabel('Prix de vente (SalePrice)')
-plt.title('Régression Linéaire ')
-plt.legend()
-plt.show()
-
-# Calcul et visualisation des résidus
-residus = Y - y_pred
-
-# Histograme des résidus
-plt.figure(figsize=(10, 6))
-sns.histplot(residus, kde=True)
-plt.xlabel('Résidus')
-plt.ylabel('Densité')
-plt.title('Distribution des Résidus')
-plt.show()
-
-# Q-Q Plot des résidus
-plt.figure(figsize=(10, 6))
-stats.probplot(residus, dist="norm", plot=plt)
-plt.title("Q-Q plot des résidus")
-plt.show()
-
-"""2 . Ajustement du Modèle Polynomial :"""
-
-# Régression polynomiale (degré 2)
-poly_reg = PolynomialFeatures(degree=2)
-X_poly = poly_reg.fit_transform(X)
-regression_poly = LinearRegression()
-regression_poly.fit(X_poly, Y)
-
-X_sorted = np.sort(X, axis=0)                   # Trie X pour un tracé lisse car sinon probleme
-X_poly = poly_reg.transform(X_sorted)           # Transformation polynomiale de X trié
-y_pred_poly = regression_poly.predict(X_poly)   # Prédictions sur X trié
-
-# Visualisation du modèle polynomial
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, color='blue')
-plt.scatter(X, y_pred_poly, color='green', alpha=0.5) # Prediction modele Polynomiale
-plt.xlabel('Surface habitable totale (GrLivArea)')
-plt.ylabel('Prix de vente (SalePrice)')
-plt.title('Régression polynomiale ')
-plt.legend()
-plt.show()
-
-# 3. Régression Polynomiale avec régularisation Ridge (degré 2)
-ridge_reg = Ridge(alpha=1.0)  # Choix d'une valeur de régularisation alpha=1.0
-ridge_reg.fit(X_poly, Y)
-y_pred_ridge = ridge_reg.predict(X_poly)
-
-# Visualisation des prédictions du modèle polynomial avec régularisation
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, color='blue', label='Données observées')
-plt.plot(np.sort(X, axis=0), np.sort(y_pred_poly, axis=0), color='green')
-plt.plot(np.sort(X, axis=0), np.sort(y_pred_ridge, axis=0), color='purple')
-plt.xlabel('Surface habitable totale (GrLivArea)')
-plt.ylabel('Prix de vente (SalePrice)')
-plt.title('Comparaison des modèles avec et sans régularisation Ridge')
-plt.legend()
-plt.show()
-
-# 4. Comparaison des Coefficients
-
-# Calcul de l'erreur quadratique moyenne (RMSE) et du R2 Lineaire 
-rmse = np.sqrt(mean_squared_error(Y, y_pred))
-r2 = r2_score(Y, y_pred)
-print(rmse)             # 56034.303865279944
-print(r2)               # 0.5021486502718042
-
-# Calcul de l'erreur quadratique moyenne (RMSE) et du R2 Polynomiale
-rmse_poly = np.sqrt(mean_squared_error(Y, y_pred_poly))
-r2_poly = r2_score(Y, y_pred_poly)
-print(rmse_poly)        # 98483.61544430589
-print(r2_poly)          # -0.5378702456449553
-
-# Calcul de l'erreur quadratique moyenne (RMSE) et du R2 Ridge
-rmse_ridge = np.sqrt(mean_squared_error(Y, y_pred_ridge))
-r2_ridge = r2_score(Y, y_pred_ridge)
-print( rmse_ridge)      # 79398.42392700305
-print(r2_ridge)         # 0.0004247586899346345
-
-# Coefficient Ridge 
-print(regression_poly.coef_) # [ 0.00000000e+00  1.45549389e+02 -1.02504204e-02]
-print(ridge_reg.coef_)       # [ 0.00000000e+00 -4.61750912e+00  4.10715169e-04]
-
-
-"""II - Validation Croisée et Intervalle de Confiance"""
-# Validation Croisée :

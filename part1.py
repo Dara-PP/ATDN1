@@ -1,131 +1,61 @@
-import numpy as np
+import time
+from matplotlib import pyplot as plt
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.linear_model import LinearRegression
 
-from scipy import stats
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+from sklearn.feature_extraction.text import CountVectorizer
 
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.metrics import mean_squared_error, r2_score 
+from sklearn import svm 
 
 
-# Configuration de Seaborn pour style
-sns.set_style("whitegrid")
+"""Exercice 1. Classification avec SVM"""
+# Chargement du fichier CSV avec le bon encodage
+data = pd.read_csv('./sms_spam.csv', encoding='latin1') 
 
-"""Regression Lineaire"""
-#.1 Generation et visualisation des données 
+# Prétraitement des données
+# Nettoyage des données
+data = data[['v1', 'v2']]  # Garder uniquement les colonnes nécessaires pas les Nan sans cette ligne nous avons des Nan qui apparaissent
+data = data.dropna(subset=['v1', 'v2'])  # Supprimer les lignes avec des valeurs manquantes
+data['v2'] = data['v2'].str.strip()  # Nettoyer les messages
 
-# Génération de données  : 
-np.random.seed(0)
-X = 2 * np.random.rand(100, 1)          # 100 échantillons pour la variable X indépendantes
-bruit = np.random.randn(100, 1)         # Bruit gaussien avec randn bruit realiste
-Y = 7 + 4 * X + bruit                   # Variable Y avec bruit variables dependante
+# Convertir les labels en valeurs numériques
+data['v1'] = data['v1'].map({'ham': 0, 'spam': 1}) 
 
-# Visualisation des données
-plt.figure(figsize=(10, 6))             # Taille figure graphique
-plt.scatter(X, Y, label='échantillons') # Trace les variables x,y
-# Informations graphiques
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Données générées de base')
-plt.legend()
+# Vectorisation des textes
+vectorizer = CountVectorizer(stop_words='english', max_features=3000)  # Limiter à 3000 mots
+X = vectorizer.fit_transform(data['v2']).toarray()
+y = data['v1'].values
+
+# Division des données en ensemble d'entraînement et de test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Entraîner le modèle SVM 
+start_time = time.time() # lancement time pour mesure du temps 
+svm_model = svm.SVC(kernel='linear', probability=True) #creation d'une instance du modele SVM
+svm_model.fit(X_train, y_train) # lancement de l'entrainement du modele 
+train_time = time.time() - start_time
+print(f"Temps d'entraînement: {train_time} secondes")
+
+# Prédictions et évaluation
+"""  # Le modele prédit apres entrainement sur l'ensemble de test ici X_test y_pred contient ensuite les classes prédites par le modele"""
+y_pred = svm_model.predict(X_test)
+
+# Évaluation avec les différentes metrics
+print("Rapport de classification:")
+print(classification_report(y_test, y_pred))
+
+# Calcul du ROC-AUC
+y_pred_prob = svm_model.decision_function(X_test) #Le ROC_AUC necéssite des probabilites ou des scores de décision
+roc_auc = roc_auc_score(y_test, y_pred_prob)
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob)
+
+# Tracer la courbe ROC
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='gray',)
+plt.title('Courbe ROC modèle SVM')
+plt.xlabel('False Positive Rate FPR')
+plt.ylabel('True Positive Rate TPR')
+plt.grid()
 plt.show()
-
-# 2. Régression linéaire 
-regression = LinearRegression()         # Fonction de regressions sur scikit-learn
-regression.fit(X, Y)
-y_pred = regression.predict(X)          
-
-# Visualisation des prédictions
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, label='Données observées')                    # Données observés
-plt.plot(X, y_pred, color='red', label='Prédictions du modèle') # Predictions du modele 
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Régression linéaire avec distribution gaussienne')
-plt.legend()
-plt.show()
-
-# 3. Calcul des résidus
-residus = (Y - y_pred).flatten()
-
-# 4. Visualisation Histogramme et Q-Q plot 
-# Visualisation des résidus avec un histogramme
-plt.figure(figsize=(10, 6))
-sns.histplot(residus, kde = True) # Creer l'historigramme avec 
-plt.xlabel('Résidus')
-plt.ylabel('Densité')
-plt.title('Distribution des résidus')
-plt.show()
-
-# Utilisation de probplot pour le Q-Q plot
-plt.figure(figsize=(10, 6))
-stats.probplot(residus, dist="norm", plot=plt)  # Creer une distribution de type normal avec nos residus
-plt.title("Q-Q plot Lineaire")
-plt.show()
-
-# Régression polynomiale de degré superieur
-poly_reg = PolynomialFeatures(degree=2)
-X_poly = poly_reg.fit_transform(X)
-regression_poly = LinearRegression()
-regression_poly.fit(X_poly, Y)
-
-X_sorted = np.sort(X, axis=0)                   # Trie X pour un tracé lisse car sinon probleme
-X_poly = poly_reg.transform(X_sorted)           # Transformation polynomiale de X trié
-y_pred_poly = regression_poly.predict(X_poly)   # Prédictions sur X trié
-
-# Visualisation
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, label='Échantillons', color='blue')
-plt.plot(X_sorted, y_pred_poly, color='green', label='Modèle polynomial')
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Régression linéaire et polynomiale')
-plt.legend()
-plt.show()
-
-# 3. Calcul des résidus
-residus_poly = (Y - y_pred_poly).flatten()
-
-# 4. Visualisation Histogramme et Q-Q plot 
-# Visualisation des résidus avec un histogramme
-plt.figure(figsize=(10, 6))
-sns.histplot(residus_poly, kde = True) # Creer l'historigramme avec 
-plt.xlabel('Résidus')
-plt.ylabel('Densité')
-plt.title('Distribution des résidus')
-plt.show()
-
-# Utilisation de probplot pour le Q-Q plot
-plt.figure(figsize=(10, 6))
-stats.probplot(residus_poly, dist="norm", plot=plt)  # Creer une distribution de type normal avec nos residus
-plt.title("Q-Q plot polynomiale")
-plt.show()
-
-
-# calcul coefficient de détermination (R2), la fiabilite du modele Lineaire 0.84 ce qui est enormal pour un modele Lineaire
-r2 = r2_score(Y,y_pred)    
-# Le RMSE est normal 0.9962121504602562 mais pas tres optimise                  
-rmse_lin = np.sqrt(mean_squared_error(Y, y_pred))
-print(r2)  
-print(rmse_lin)
-
-# calcul coefficient de détermination (R2) du modele Polynomiale -1.42 ce qui n'est pas normal pour un modele Polynomiale ....
-r2 = r2_score(Y,y_pred_poly)   
-# Le RMSE l'erreur quadratique est egalement res mauvaise tres loin des 0 (3.884388170918413).           
-rmse_poly = np.sqrt(mean_squared_error(Y, y_pred_poly))
-print(r2)
-print(rmse_poly) 
-
-coeffs_lin = regression.coef_
-coeffs_poly = regression_poly.coef_
-print(coeffs_lin)
-print(coeffs_poly)
-"""
-Valeur des coefficients : 
-Lineaire [[3.96846751]]
-Polynomiale [[ 0.          4.84100842 -0.45190593]]
-"""
-
-
